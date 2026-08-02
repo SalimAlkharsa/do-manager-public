@@ -1,17 +1,11 @@
 # do-manager
+As code agents got more powerful, I felt more comfortable giving them more autonomy however I did not want them running unrestricted on my personal machine nor did I want to babysit them and keep my laptop on. I decided a cheap disposable VPS was the best solution for my problem. However, I did not want to pay monthly on demand prices so I created this repository to solve my problem.
 
-A disposable DigitalOcean dev box. Spin a droplet up from a snapshot, work on
-it, destroy it. Billing is per-second, so you only pay for active time; the
-snapshot sits at rest for pennies. A 3-hour session costs about a nickel
-instead of $12/month for a box that idles.
+The general idea is to have a single control plane for spinning up and then destroying boxes. The key feature here is that on every destroy a snapshot of the machine is stored so that my settings transfer across sessions (ie tmux config, git set up, firewalls etc). 
 
-The catch with ephemeral machines is state: the moment you tear one down is
-exactly the moment you're tired and forget the uncommitted repo, the token
-that only lives on that disk, the firewall rule that never made it into the
-image. This tool automates the loop — and, more importantly, **refuses to
-tear down a box in a state you'd regret**. You can't remember the checklist,
-so the box asserts it.
+One future improvement on my mind is the ability to use multiple boxes at once for several tasks or configuring the size of the box depending on the task. I have not made such improvements yet because I have not experienced this problem yet. The bigger feature on my mind is the ability to use DO Apps to track issue requests on my GitHub projects and have an autonomous agent try to maintain my projects. I am still thinking through the architecture of that problem and trying to zone in on what quality of life improvement I am going for.
 
+# General Directory
 `up.sh` / `down.sh` / `status.sh` run on your laptop. `box/` runs on the
 droplet (the snapshot carries a checkout of this repo).
 
@@ -35,8 +29,7 @@ teardown if:
 - a reboot is pending (you'd snapshot a half-updated box)
 
 Then it asks the droplet whether any secret is **newer** than your local
-encrypted bundle, and stops if that check can't complete — staleness is the
-failure that would otherwise be silent, so it fails closed.
+encrypted bundle, and stops if that check can't complete.
 
 ## Snapshot safety
 
@@ -80,28 +73,16 @@ scp dev-box:do-manager/secrets.age .   # then fetch it to your laptop
 bash box/secrets.sh verify    # rehearse the passphrase without extracting
 ```
 
-**The bundle is gitignored and must stay out of git.** A published ciphertext
-can be brute-forced offline forever and can never be un-published. Keep
-`secrets.age` somewhere private with its own durability story (set
-`SECRETS_BUNDLE` in `config.sh` to point at it) — that store, and the
-passphrase in your head, are the real single points of failure.
-
-**There is no recovery.** `age` has no escrow: lose the passphrase and the
-bundle is permanently unreadable.
-
-`push` and `pull` need a real terminal — `age -p` reads `/dev/tty` and
-rejects piped input, so the passphrase can't be supplied by a script or
-captured in a log.
+**The bundle is gitignored and must stay out of git.** 
+^ Treat this as a light-weight secrets manager (keep in mind I am only using this for low risk projects)!
 
 ## The box itself
 
 - The dev user (default `dev`, override with `DEV=`) gets **passwordless
-  sudo**. This is a single-user throwaway machine, not a hardened server —
-  the firewall and your SSH key are the boundary. Don't reuse this setup for
-  anything shared.
+  sudo**. This is a single-user throwaway machine.
 - Enabling ufw over SSH is how you lock yourself out, so `provision.sh` arms
   a **dead-man switch**: the firewall disables itself after 5 minutes unless
-  you confirm you still have a session (`systemctl stop ufw-deadman.timer`).
+  you confirm you still have a session (`systemctl stop ufw-deadman.timer`). --> An appropriate TODO is to automate that.
 - `clean.sh` strips caches, logs, and the swapfile (~5GB) before snapshotting;
   `first-boot.sh` recreates swap via cloud-init on every create.
 - `provision.sh` normalizes a box that already has your toolchain on it — a
