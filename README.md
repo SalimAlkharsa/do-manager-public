@@ -3,7 +3,7 @@ As code agents got more powerful, I felt more comfortable giving them more auton
 
 The general idea is to have a single control plane for spinning up and then destroying boxes. The key feature here is that on every destroy a snapshot of the machine is stored so that my settings transfer across sessions (ie tmux config, git set up, firewalls etc). 
 
-One future improvement on my mind is the ability to use multiple boxes at once for several tasks or configuring the size of the box depending on the task. I have not made such improvements yet because I have not experienced this problem yet. The bigger feature on my mind is the ability to use DO Apps to track issue requests on my GitHub projects and have an autonomous agent try to maintain my projects. I am still thinking through the architecture of that problem and trying to zone in on what quality of life improvement I am going for.
+One future improvement on my mind is the ability to use multiple boxes at once for several tasks or configuring the size of the box depending on the task. I have not made such improvements yet because I have not experienced this problem yet. The bigger feature on my mind is the ability to use DO Apps to track issue requests on my GitHub projects and have an autonomous agent try to maintain my projects. I am still thinking through the architecture of that problem and trying to zone in on what quality of life improvement I am going for. Another key issue I have to work through is making sure an agent can't destroy an environment and then have the snapshot save a broken env. 
 
 # General Directory
 `up.sh` / `down.sh` / `status.sh` run on your laptop. `box/` runs on the
