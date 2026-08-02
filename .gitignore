@@ -1,0 +1,14 @@
+# Per-machine configuration — copy the .example files and edit.
+config.sh
+box/manifest.sh
+box/files/local/
+
+# The encrypted secrets bundle must never be committed: a public ciphertext
+# can be brute-forced offline forever and can never be un-published.
+secrets.age
+*.age
+
+# Local noise
+*.bak
+claude.txt
+typescript

@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Split-tunnel openconnect wrapper: only the routes you list go over the VPN,
+# so the SSH session that started it survives the connect.
+#
+# Configure in /etc/default/split-vpn (or the environment):
+#   VPN_USER="your-username"
+#   VPN_GATEWAY="vpn.example.edu"
+#   VPN_ROUTES="10.1.0.0/16 192.0.2.0/24"
+#
+# Needs: openconnect, vpnc-scripts, vpn-slice
+#   apt-get install -y openconnect vpnc-scripts && pip3 install vpn-slice
+#
+# Install:  install -m755 split-vpn /usr/local/bin/
+# Or drop it in box/files/local/ and provision.sh installs it for you.
+set -euo pipefail
+
+[ -f /etc/default/split-vpn ] && source /etc/default/split-vpn
+VPN_USER="${VPN_USER:?set VPN_USER in /etc/default/split-vpn}"
+VPN_GATEWAY="${VPN_GATEWAY:?set VPN_GATEWAY in /etc/default/split-vpn}"
+PIDFILE="/var/run/split-vpn.pid"
+
+# Beware routing 10.0.0.0/8 wholesale: it can collide with your cloud
+# provider's private networking. Route the specific subnets you need.
+read -r -a DEFAULT_ROUTES <<< "${VPN_ROUTES:-}"
+[ ${#DEFAULT_ROUTES[@]} -gt 0 ] || { echo "set VPN_ROUTES in /etc/default/split-vpn" >&2; exit 1; }
+
+cmd="${1:-up}"
+shift || true
+
+tun_up() { ip link show | grep -q '^[0-9]*: tun'; }
+
+case "$cmd" in
+  up)
+    if tun_up; then
+      ip -br addr show type tun
+      exit 0
+    fi
+    ROUTES=("${DEFAULT_ROUTES[@]}" "$@")
+    echo "Connecting to $VPN_GATEWAY as $VPN_USER"
+    echo "Split-tunnel routes: ${ROUTES[*]}"
+    exec sudo openconnect \
+      --user="$VPN_USER" \
+      --background \
+      --pid-file="$PIDFILE" \
+      --script "vpn-slice ${ROUTES[*]}" \
+      "$VPN_GATEWAY"
+    ;;
+  down)
+    if [ -f "$PIDFILE" ]; then
+      sudo kill "$(cat "$PIDFILE")" && echo "VPN disconnected."
+    else
+      sudo pkill -f "openconnect.*$VPN_GATEWAY" && echo "VPN disconnected." || echo "No VPN running."
+    fi
+    ;;
+  status)
+    if tun_up; then
+      ip -br addr show type tun
+      ip route show dev "$(ip -br link show type tun | awk '{print $1}')"
+    else
+      echo "VPN is DOWN."
+    fi
+    ;;
+  *)
+    echo "Usage: split-vpn <up|down|status> [extra-subnets ...]" >&2
+    echo "Defaults: ${DEFAULT_ROUTES[*]}" >&2
+    exit 1
+    ;;
+esac
